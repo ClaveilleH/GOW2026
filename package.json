@@ -1,0 +1,20 @@
+{
+  "name": "gow2026",
+  "version": "1.0.0",
+  "description": "Projet Babylon.js pour GOW2026",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . -p 3000"
+  },
+  "keywords": [
+    "babylonjs",
+    "3d",
+    "webgl"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}
