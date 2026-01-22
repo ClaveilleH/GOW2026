@@ -19,24 +19,7 @@ function createScene() {
     let scene = new BABYLON.Scene(engine);
     // ambiant color of the scene = green (like a green sun!)
     scene.ambiantColor = new BABYLON.Color3(0, 1, 0);
-
-    // a plane
-    let ground = BABYLON.MeshBuilder.CreateGround("myGround", {width: 60, height: 60, segments:50}, scene);
-    let mirrorMaterial = new BABYLON.StandardMaterial("mirrorMaterial", scene);
-    
-    mirrorMaterial.diffuseColor = new BABYLON.Color3(0.4, 1, 0.4);
-    // no reflection on the ground, specular color = black...
-    mirrorMaterial.specularColor = new BABYLON.Color3.Black;
-
-    // 1024 = size of the dynamically generated mirror texture
-    mirrorMaterial.reflectionTexture = new BABYLON.MirrorTexture("mirror", 1024, scene, true);
-    // Plane ax + by +cz + d = 0
-    // first 3 params = normal vector to the plane + offset from the origin
-    // try to change last parameter to say -10, or try to set first one to say 0.5
-    mirrorMaterial.reflectionTexture.mirrorPlane = new BABYLON.Plane(0, -1.0, 0, -2.0);
-    // "strength / opacity of the reflection"
-    mirrorMaterial.reflectionTexture.level = 1; // between 0 and 1
-    ground.material = mirrorMaterial;
+    let ground, mirrorMaterial = createGround(scene);
     
     // Create some objects 
     // params = number of horizontal "stripes", diameter...
@@ -108,23 +91,19 @@ function createScene() {
     mirrorMaterial.reflectionTexture.renderList.push(cylinder);
     cylinderMaterial.alpha = 0.5;
     cylinderMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
-    cylinderMaterial.emmissiveColor = new BABYLON.Color3(1, 0, 1);
+    cylinderMaterial.emissiveColor = new BABYLON.Color3(1, 0, 1);
     
 
 
     let camera = new BABYLON.FreeCamera("myCamera", new BABYLON.Vector3(0, 1, -30), scene);
-   // This targets the camera to scene origin
-   //camera.setTarget(BABYLON.Vector3.Zero());
-   camera.attachControl(canvas);
+    // This targets the camera to scene origin
+    //camera.setTarget(BABYLON.Vector3.Zero());
+    camera.attachControl(canvas);
 
     // lights
     var light = new BABYLON.PointLight("myPointLight", new BABYLON.Vector3(0, 3, 0), scene);
     light.intensity = .5;
     light.diffuse = new BABYLON.Color3(1, .5, .5);
-
-    var light2 = new BABYLON.PointLight("myPointLight2", new BABYLON.Vector3(0, 3, -10), scene);
-    light2.intensity = .5;
-    light2.diffuse = new BABYLON.Color3.Green;
 
     
     let counter = 0;
@@ -146,6 +125,51 @@ function createScene() {
 
 
     return scene;
+}
+
+
+function createGround(scene) {
+
+    // const groundOptions = { width:2000, height:2000, subdivisions:20, minHeight:0, maxHeight:100, onReady: onGroundCreated};
+    // //scene is optional and defaults to the current scene
+    // const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap("gdhm", 'images/hmap1.png', groundOptions, scene); 
+
+    // function onGroundCreated() {
+    //     const groundMaterial = new BABYLON.StandardMaterial("groundMaterial", scene);
+    //     groundMaterial.diffuseTexture = new BABYLON.Texture("images/grass.jpg");
+    //     ground.material = groundMaterial;
+    //     // to be taken into account by collision detection
+    //     ground.checkCollisions = true;
+    //     //groundMaterial.wireframe=true;
+    // }
+    // return ground;
+
+    const groundOptions = { width:60, height:60 };
+
+    // a plane
+    let ground = BABYLON.MeshBuilder.CreateGround("myGround", groundOptions, scene);
+
+    let mirrorMaterial = new BABYLON.StandardMaterial("mirrorMaterial", scene);
+    
+    mirrorMaterial.diffuseColor = new BABYLON.Color3(0.4, 1, 0.4);
+    // no reflection on the ground, specular color = black...
+    mirrorMaterial.specularColor = new BABYLON.Color3.Black;
+
+    // 1024 = size of the dynamically generated mirror texture
+    mirrorMaterial.reflectionTexture = new BABYLON.MirrorTexture("mirror", 1024, scene, true);
+    // Plane ax + by +cz + d = 0
+    // first 3 params = normal vector to the plane + offset from the origin
+    // try to change last parameter to say -10, or try to set first one to say 0.5
+    mirrorMaterial.reflectionTexture.mirrorPlane = new BABYLON.Plane(0, -1.0, 0, -2.0);
+    // "strength / opacity of the reflection"
+    mirrorMaterial.reflectionTexture.level = 1; // between 0 and 1
+    ground.material = mirrorMaterial;
+
+    mirrorMaterial.diffuseTexture = new BABYLON.Texture("assets/textures/TRON_TileX1.png", scene);
+    mirrorMaterial.diffuseTexture.uScale = 10.0;
+    mirrorMaterial.diffuseTexture.vScale = 10.0;
+
+    return ground, mirrorMaterial;
 }
 
 window.addEventListener("resize", () => {
