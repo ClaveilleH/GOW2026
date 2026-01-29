@@ -1,6 +1,10 @@
 let canvas;
 let engine;
 let scene;
+let inputStates = {};
+
+let followCamera;
+let freeCamera;
 
 window.onload = startGame;
 
@@ -8,28 +12,191 @@ function startGame() {
     canvas = document.querySelector("#myCanvas");
     engine = new BABYLON.Engine(canvas, true);
     scene = createScene();
-
-    engine.runRenderLoop(() => {
+    modifySettings();
     
+    
+    engine.runRenderLoop(() => {
+        let moto = scene.getMeshByName("moto");
+        if (moto) moto.move();
         scene.render();
     });
 }
 
 function createScene() {
-    let scene = new BABYLON.Scene(engine);
+    scene = new BABYLON.Scene(engine);
     // ambiant color of the scene = green (like a green sun!)
     scene.ambiantColor = new BABYLON.Color3(0, 1, 0);
     let ground, mirrorMaterial = createGround(scene);
+    freeCamera = createFreeCamera(scene);
+    let light = createLight(scene);
+    createMoto(scene, mirrorMaterial).then(_moto => {
+        let moto = _moto;
+        // you can do additional stuff with the moto here if needed
+        followCamera = createFollowCamera(scene, moto);
+        scene.activeCamera = followCamera;
+    });
+    // let moto =
+
+    // scene.activeCamera = camera;
+    createSphere(scene, mirrorMaterial);
+
+
+    return scene;
+
+}
+
+function switchCamera(newCamera) {
+    if (scene.activeCamera == followCamera) {
+        scene.activeCamera = freeCamera;
+    } else {
+        scene.activeCamera = followCamera;
+    }
+}
+
+function createFreeCamera(scene) {
     
-    // Create some objects 
-    // params = number of horizontal "stripes", diameter...
-    //let sphere = BABYLON.MeshBuilder.CreateSphere("mySphere", {diameter: 2, segments: 32}, scene);
+    let camera = new BABYLON.FreeCamera("myCamera", new BABYLON.Vector3(0, 1, -30), scene);
+    // This targets the camera to scene origin
+    //camera.setTarget(BABYLON.Vector3.Zero());
+    camera.attachControl(canvas);
+    return camera;
+}
+
+function createFollowCamera(scene, target) {
+    let camera = new BABYLON.FollowCamera("motoFollowCamera", target.position, scene, target);
+
+    camera.radius = 40; // how far from the object to follow
+	camera.heightOffset = 10; // how high above the object to place the camera
+	camera.rotationOffset = 0; // the viewing angle
+	camera.cameraAcceleration = .1; // how fast to move
+	camera.maxCameraSpeed = 5; // speed limit
+
+    return camera;
+}
+
+function createMoto(scene, mirrorMaterial) {
+    return new Promise((resolve) => {
+        BABYLON.SceneLoader.ImportMesh(
+            "",
+            "assets/models/",
+            "lightCycleGen1.glb",
+            scene,
+            (meshes) => {
+                let moto = meshes[0];
+
+                // Annuler le rotationQuaternion pour pouvoir utiliser rotation
+                moto.rotationQuaternion = null;
+
+                moto.position = new BABYLON.Vector3(0, 0, 0);
+                moto.scaling = new BABYLON.Vector3(2, 2, 2);
+                moto.isVisible = true;
+                mirrorMaterial.reflectionTexture.renderList.push(moto);
+                if (moto.getChildMeshes) {
+                    moto.getChildMeshes().forEach(child => {
+                        mirrorMaterial.reflectionTexture.renderList.push(child);
+                    });
+                }
+
+                moto.position.y = 0.6;
+                moto.speed = -1;
+                moto.frontVector = new BABYLON.Vector3(0, 0, 0);
+                moto.name = "moto";
+                moto.move = () => {
+                            //moto.position.z += -1; // speed should be in unit/s, and depends on
+                                            // deltaTime !
+
+                    // if we want to move while taking into account collision detections
+                    // collision uses by default "ellipsoids"
+
+                    let yMovement = 0;
+                    let zMovement = 0;
+                    if (moto.position.y > 2) {
+                        zMovement = 0;
+                        yMovement = -2;
+                    } 
+                    //moto.moveWithCollisions(new BABYLON.Vector3(0, yMovement, zMovement));
+
+                    if(inputStates.up) {
+                        //moto.moveWithCollisions(new BABYLON.Vector3(0, 0, 1*moto.speed));
+                        moto.moveWithCollisions(moto.frontVector.multiplyByFloats(moto.speed, moto.speed, moto.speed));
+                    }    
+                    if(inputStates.down) {
+                        //moto.moveWithCollisions(new BABYLON.Vector3(0, 0, -1*moto.speed));
+                        moto.moveWithCollisions(moto.frontVector.multiplyByFloats(-moto.speed, -moto.speed, -moto.speed));
+
+                    }    
+                    if(inputStates.left) {
+                        //moto.moveWithCollisions(new BABYLON.Vector3(-1*moto.speed, 0, 0));
+                        moto.rotation.y -= 0.02;
+                        // moto.frontVector = new BABYLON.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
+                        moto.frontVector = new BABYLON.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
+                        
+                    }    
+                    if(inputStates.right) {
+                        //moto.moveWithCollisions(new BABYLON.Vector3(1*moto.speed, 0, 0));
+                        moto.rotation.y += 0.02;
+                        moto.frontVector = new BABYLON.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
+                    }
+
+                resolve(moto);
+                }
+            }
+        );
+    });
+}
+
+
+function createGround(scene) {
+    const groundOptions = { width:160, height:160 };
+
+    // a plane
+    let ground = BABYLON.MeshBuilder.CreateGround("myGround", groundOptions, scene);
+
+    let mirrorMaterial = new BABYLON.StandardMaterial("mirrorMaterial", scene);
+    // mirrorMaterial.ambientColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+    // mirrorMaterial.
+    mirrorMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
+    mirrorMaterial.emissiveColor = new BABYLON.Color3(0, 0, 1);
+    // no reflection on the ground, specular color = black...
+    mirrorMaterial.specularColor = new BABYLON.Color3.Black;
+
+    // 1024 = size of the dynamically generated mirror texture
+    // mirrorMaterial.reflectionTexture = new BABYLON.MirrorTexture("mirror", 1024, scene, true);
+    mirrorMaterial.reflectionTexture = new BABYLON.MirrorTexture("mirror", 2048, scene, true);
+    // Plane ax + by +cz + d = 0
+    // first 3 params = normal vector to the plane + offset from the origin
+    // try to change last parameter to say -10, or try to set first one to say 0.5
+    mirrorMaterial.reflectionTexture.mirrorPlane = new BABYLON.Plane(0, -0.1, 0, -0.0);
+    // "strength / opacity of the reflection"
+    mirrorMaterial.reflectionTexture.level = 0.5; // between 0 and 1
+    
+    mirrorMaterial.diffuseTexture = new BABYLON.Texture("assets/textures/TRON_TileX1v2.png", scene);
+    // calcule automatiquement le nombre de répétitions nécessaires pour couvrir la surface en gardant les proportions
+    mirrorMaterial.diffuseTexture.uScale = 20.0;
+    mirrorMaterial.diffuseTexture.vScale = 20.0;
+    
+    ground.material = mirrorMaterial;
+    return ground, mirrorMaterial;
+}
+
+function createLight(scene) {
+    var light = new BABYLON.HemisphericLight("myHemiLight", new BABYLON.Vector3(0, 3, 0), scene);
+    light.intensity = 0.3;
+    // light.diffuse = new BABYLON.Color3(1, 1, 1);
+    // light.specular = new BABYLON.Color3(1, 1, 1);
+    // light.groundColor = new BABYLON.Color3(1, 1, 1);
+    return light;
+}
+
+
+
+function createSphere(scene, mirrorMaterial) {
     let spheres = [];
     let sphereMaterials = [];
 
-    for(let i = 0; i < 10; i++) {
-        spheres[i] = BABYLON.MeshBuilder.CreateSphere("mySphere" +i, {diameter: 2, segments: 32}, scene);
-        spheres[i].position.x += 3*i -9;
+    for (let i = 0; i < 10; i++) {
+        spheres[i] = BABYLON.MeshBuilder.CreateSphere("mySphere" + i, { diameter: 2, segments: 32 }, scene);
+        spheres[i].position.x += 3 * i - 9;
         spheres[i].position.y = 2;
 
         sphereMaterials[i] = new BABYLON.StandardMaterial("sphereMaterial" + i, scene);
@@ -41,7 +208,7 @@ function createScene() {
     sphereMaterials[0].ambiantColor = new BABYLON.Color3(0, 0.5, 0);
     sphereMaterials[0].diffuseColor = new BABYLON.Color3(5, 0, 0);
     sphereMaterials[0].specularColor = new BABYLON.Color3(0, 0, 0);
-   
+
     sphereMaterials[1].ambiantColor = new BABYLON.Color3(0, 0.5, 0);
     sphereMaterials[1].diffuseColor = new BABYLON.Color3(5, 0, 1);
     sphereMaterials[1].specularColor = new BABYLON.Color3(0, 0, 3);
@@ -56,15 +223,11 @@ function createScene() {
     // sphereMaterials[3].diffuseTexture = new BABYLON.Texture("images/lightning.jpg", scene);
     // // as if the sphere was illuminated from inside in Green
     // sphereMaterials[3].emissiveColor = new BABYLON.Color3.Green
-
     // sphereMaterials[4].diffuseTexture = new BABYLON.Texture("images/lightning.jpg", scene);
     // sphereMaterials[4].emissiveColor = new BABYLON.Color3.Yellow
-
     // sphereMaterials[5].diffuseTexture = new BABYLON.Texture("images/lightning.jpg", scene);
     // sphereMaterials[5].emissiveColor = new BABYLON.Color3.Red;
     // sphereMaterials[5].diffuseTexture.uScale *= 4;
-
-    
     sphereMaterials[6].ambientColor = new BABYLON.Color3(0, .8, 0);
     sphereMaterials[6].diffuseColor = new BABYLON.Color3(1, 0, 0);
     // alpha property means "alpha channel" = transparency
@@ -79,12 +242,9 @@ function createScene() {
     // sphereMaterials[8].ambientColor = new BABYLON.Color3(0, .3, 0);
     // sphereMaterials[8].bumpTexture = new BABYLON.Texture("images/normal_map.jpg", scene);
     // sphereMaterials[8].bumpTexture.level = 15.0;
-
     // sphereMaterials[9].diffuseTexture = new BABYLON.VideoTexture("video", ["videos/michel.mp4"],scene);
     // sphereMaterials[9].diffuseTexture.vScale *= -1;
-
-
-    let cylinder = BABYLON.MeshBuilder.CreateCylinder("myCylinder", {diameterTop: 3, diameterBottom: 3, height: 5, tessellation: 32}, scene);
+    let cylinder = BABYLON.MeshBuilder.CreateCylinder("myCylinder", { diameterTop: 3, diameterBottom: 3, height: 5, tessellation: 32 }, scene);
     cylinder.position = new BABYLON.Vector3(10, 2.5, 0);
     let cylinderMaterial = new BABYLON.StandardMaterial("cylinderMaterial", scene);
     cylinder.material = cylinderMaterial;
@@ -92,85 +252,90 @@ function createScene() {
     cylinderMaterial.alpha = 0.5;
     cylinderMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
     cylinderMaterial.emissiveColor = new BABYLON.Color3(1, 0, 1);
-    
 
 
-    let camera = new BABYLON.FreeCamera("myCamera", new BABYLON.Vector3(0, 1, -30), scene);
-    // This targets the camera to scene origin
-    //camera.setTarget(BABYLON.Vector3.Zero());
-    camera.attachControl(canvas);
 
-    // lights
-    var light = new BABYLON.PointLight("myPointLight", new BABYLON.Vector3(0, 3, 0), scene);
-    light.intensity = .5;
-    light.diffuse = new BABYLON.Color3(1, .5, .5);
 
-    
     let counter = 0;
 
     scene.registerBeforeRender(() => {
-        for(let i = 0; i < spheres.length; i++) {
-            spheres[i].position.z = 2*i + Math.sin((i*counter)/2);
+        for (let i = 0; i < spheres.length; i++) {
+            spheres[i].position.z = 2 * i + Math.sin((i * counter) / 2);
             counter += 0.005;
 
             //sphereMaterials[i].wireframe = true
-
         }
 
         // sphereMaterials[4].diffuseTexture.uOffset += 0.005;
         // sphereMaterials[5].diffuseTexture.uScale += 0.03;
-
         cylinder.rotation.x += 0.01;
+    });
+}
+
+function modifySettings() {
+    // as soon as we click on the game window, the mouse pointer is "locked"
+    // you will have to press ESC to unlock it
+    scene.onPointerDown = () => {
+        if(!scene.alreadyLocked) {
+            console.log("requesting pointer lock");
+            canvas.requestPointerLock();
+        } else {
+            console.log("Pointer already locked");
+        }
+    }
+
+    document.addEventListener("pointerlockchange", () => {
+        let element = document.pointerLockElement || null;
+        if(element) {
+            // lets create a custom attribute
+            scene.alreadyLocked = true;
+        } else {
+            scene.alreadyLocked = false;
+        }
     })
 
-
-    return scene;
-}
-
-
-function createGround(scene) {
-
-    // const groundOptions = { width:2000, height:2000, subdivisions:20, minHeight:0, maxHeight:100, onReady: onGroundCreated};
-    // //scene is optional and defaults to the current scene
-    // const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap("gdhm", 'images/hmap1.png', groundOptions, scene); 
-
-    // function onGroundCreated() {
-    //     const groundMaterial = new BABYLON.StandardMaterial("groundMaterial", scene);
-    //     groundMaterial.diffuseTexture = new BABYLON.Texture("images/grass.jpg");
-    //     ground.material = groundMaterial;
-    //     // to be taken into account by collision detection
-    //     ground.checkCollisions = true;
-    //     //groundMaterial.wireframe=true;
-    // }
-    // return ground;
-
-    const groundOptions = { width:60, height:60 };
-
-    // a plane
-    let ground = BABYLON.MeshBuilder.CreateGround("myGround", groundOptions, scene);
-
-    let mirrorMaterial = new BABYLON.StandardMaterial("mirrorMaterial", scene);
+    // key listeners for the tank
+    inputStates.left = false;
+    inputStates.right = false;
+    inputStates.up = false;
+    inputStates.down = false;
+    inputStates.space = false;
     
-    mirrorMaterial.diffuseColor = new BABYLON.Color3(0.4, 1, 0.4);
-    // no reflection on the ground, specular color = black...
-    mirrorMaterial.specularColor = new BABYLON.Color3.Black;
+    //add the listener to the main, window object, and update the states
+    window.addEventListener('keydown', (event) => {
+        if ((event.key === "q")|| (event.key === "Q")) {
+           inputStates.left = true;
+           console.log("left key pressed");
+        } else if ((event.key === "z")|| (event.key === "Z")){
+           inputStates.up = true;
+        } else if ((event.key === "d")|| (event.key === "D")){
+           inputStates.right = true;
+        } else if ((event.key === "s")|| (event.key === "S")) {
+           inputStates.down = true;
+        }  else if (event.key === " ") {
+           inputStates.space = true;
+        }  else if (event.key === "c" || (event.key === "C")) {
+           switchCamera();
+        }
+    }, false);
 
-    // 1024 = size of the dynamically generated mirror texture
-    mirrorMaterial.reflectionTexture = new BABYLON.MirrorTexture("mirror", 1024, scene, true);
-    // Plane ax + by +cz + d = 0
-    // first 3 params = normal vector to the plane + offset from the origin
-    // try to change last parameter to say -10, or try to set first one to say 0.5
-    mirrorMaterial.reflectionTexture.mirrorPlane = new BABYLON.Plane(0, -1.0, 0, -2.0);
-    // "strength / opacity of the reflection"
-    mirrorMaterial.reflectionTexture.level = 1; // between 0 and 1
-    ground.material = mirrorMaterial;
-
-    mirrorMaterial.diffuseTexture = new BABYLON.Texture("assets/textures/TRON_TileX1.png", scene);
-    mirrorMaterial.diffuseTexture.uScale = 10.0;
-    mirrorMaterial.diffuseTexture.vScale = 10.0;
-
-    return ground, mirrorMaterial;
+    //if the key will be released, change the states object 
+    window.addEventListener('keyup', (event) => {
+        if ((event.key === "q")|| (event.key === "Q")) {
+           inputStates.left = false;
+        } else if ((event.key === "z")|| (event.key === "Z")){
+           inputStates.up = false;
+        } else if ((event.key === "d")|| (event.key === "D")){
+           inputStates.right = false;
+        } else if ((event.key === "s")|| (event.key === "S")) {
+           inputStates.down = false;
+        }  else if (event.key === " ") {
+           inputStates.space = false;
+        }
+    }, false);
 }
+
+
 
 window.addEventListener("resize", () => {
     engine.resize()
