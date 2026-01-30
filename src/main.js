@@ -2,22 +2,37 @@ let canvas;
 let engine;
 let scene;
 let inputStates = {};
+let physicsPlugin; // Declare this globally
 
 let followCamera;
 let freeCamera;
 
 window.onload = startGame;
 
-function startGame() {
+async function startGame() {
     canvas = document.querySelector("#myCanvas");
     engine = new BABYLON.Engine(canvas, true);
-    scene = createScene();
+
+    //Physic plugin
+    const havokInstance = await HavokPhysics();
+    physicsPlugin = new BABYLON.HavokPlugin(true, havokInstance);
+    scene = new BABYLON.Scene(engine);
+    scene.enablePhysics(new BABYLON.Vector3(0, -9.81, 0), physicsPlugin);
+    scene.ambientColor = new BABYLON.Color3(0, 1, 0);
+    let { ground, mirrorMaterial } = createGround(scene);
+    freeCamera = createFreeCamera(scene);
+    let light = createLight(scene);
+
+    createMoto(scene, mirrorMaterial).then(_moto => {
+        followCamera = createFollowCamera(scene, _moto);
+        scene.activeCamera = followCamera;
+    });
+    createSphere(scene, mirrorMaterial);
     modifySettings();
-    
-    
+
     engine.runRenderLoop(() => {
         let moto = scene.getMeshByName("moto");
-        if (moto) moto.move();
+        if (moto && moto.move) moto.move();
         scene.render();
     });
 }
@@ -29,14 +44,15 @@ function createScene() {
     let ground, mirrorMaterial = createGround(scene);
     freeCamera = createFreeCamera(scene);
     let light = createLight(scene);
+    scene.collisionsEnabled = true; //Collision on scene
+
+    let moto;
     createMoto(scene, mirrorMaterial).then(_moto => {
-        let moto = _moto;
-        // you can do additional stuff with the moto here if needed
+        moto = _moto;
         followCamera = createFollowCamera(scene, moto);
         scene.activeCamera = followCamera;
     });
-    // let moto =
-
+    
     // scene.activeCamera = camera;
     createSphere(scene, mirrorMaterial);
 
@@ -76,82 +92,77 @@ function createFollowCamera(scene, target) {
 
 function createMoto(scene, mirrorMaterial) {
     return new Promise((resolve) => {
-        BABYLON.SceneLoader.ImportMesh(
-            "",
-            "assets/models/",
-            "lightCycleGen1.glb",
-            scene,
-            (meshes) => {
-                let moto = meshes[0];
+        BABYLON.SceneLoader.ImportMesh("", "assets/models/", "lightCycleGen1.glb", scene, (meshes) => {
+            let moto = meshes[0];
 
-                // Annuler le rotationQuaternion pour pouvoir utiliser rotation
-                moto.rotationQuaternion = null;
+            moto.position = new BABYLON.Vector3(0, 5, 0); 
+            moto.scaling = new BABYLON.Vector3(2, 2, 2);
+            moto.name = "moto";
+            moto.speed = -1;
 
-                moto.position = new BABYLON.Vector3(0, 0, 0);
-                moto.scaling = new BABYLON.Vector3(2, 2, 2);
-                moto.isVisible = true;
-                mirrorMaterial.reflectionTexture.renderList.push(moto);
-                if (moto.getChildMeshes) {
-                    moto.getChildMeshes().forEach(child => {
-                        mirrorMaterial.reflectionTexture.renderList.push(child);
-                    });
-                }
-
-                moto.position.y = 0.6;
-                moto.speed = -1;
-                moto.frontVector = new BABYLON.Vector3(0, 0, 0);
-                moto.name = "moto";
-                moto.move = () => {
-                            //moto.position.z += -1; // speed should be in unit/s, and depends on
-                                            // deltaTime !
-
-                    // if we want to move while taking into account collision detections
-                    // collision uses by default "ellipsoids"
-
-                    let yMovement = 0;
-                    let zMovement = 0;
-                    if (moto.position.y > 2) {
-                        zMovement = 0;
-                        yMovement = -2;
-                    } 
-                    //moto.moveWithCollisions(new BABYLON.Vector3(0, yMovement, zMovement));
-
-                    if(inputStates.up) {
-                        //moto.moveWithCollisions(new BABYLON.Vector3(0, 0, 1*moto.speed));
-                        moto.moveWithCollisions(moto.frontVector.multiplyByFloats(moto.speed, moto.speed, moto.speed));
-                    }    
-                    if(inputStates.down) {
-                        //moto.moveWithCollisions(new BABYLON.Vector3(0, 0, -1*moto.speed));
-                        moto.moveWithCollisions(moto.frontVector.multiplyByFloats(-moto.speed, -moto.speed, -moto.speed));
-
-                    }    
-                    if(inputStates.left) {
-                        //moto.moveWithCollisions(new BABYLON.Vector3(-1*moto.speed, 0, 0));
-                        moto.rotation.y -= 0.02;
-                        // moto.frontVector = new BABYLON.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
-                        moto.frontVector = new BABYLON.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
-                        
-                    }    
-                    if(inputStates.right) {
-                        //moto.moveWithCollisions(new BABYLON.Vector3(1*moto.speed, 0, 0));
-                        moto.rotation.y += 0.02;
-                        moto.frontVector = new BABYLON.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
-                    }
-
-                resolve(moto);
-                }
+            // Setup Mirror
+            mirrorMaterial.reflectionTexture.renderList.push(moto);
+            if (moto.getChildMeshes) {
+                moto.getChildMeshes().forEach(child => mirrorMaterial.reflectionTexture.renderList.push(child));
             }
-        );
+
+            // Create Physics
+            moto.physicsAggregate = new BABYLON.PhysicsAggregate(
+                moto,
+                BABYLON.PhysicsShapeType.BOX,
+                { mass: 1, friction: 0.5, restitution: 0.1 },
+                scene
+            );
+
+            //Physic config disable physic body to enable rotation for the moto
+            moto.physicsAggregate.body.disablePreStep = false; 
+
+            moto.physicsAggregate.body.setMassProperties({
+                inertia: new BABYLON.Vector3(0, 1, 0) //gravity
+            });
+
+            moto.move = () => {
+                let body = moto.physicsAggregate.body;
+                
+                if (inputStates.left) {
+                    moto.rotate(BABYLON.Axis.Y, -0.05, BABYLON.Space.WORLD);
+                }
+                if (inputStates.right) {
+                    moto.rotate(BABYLON.Axis.Y, 0.05, BABYLON.Space.WORLD);
+                }
+                let velocity = body.getLinearVelocity();
+                let speedMultiplier = 50;
+                let dir = moto.forward; //Get direction and rotation
+                let moveX = 0;
+                let moveZ = 0;
+
+                if (inputStates.up) {
+                    moveX = dir.x * moto.speed * speedMultiplier;
+                    moveZ = dir.z * moto.speed * speedMultiplier;
+                }
+                if (inputStates.down) {
+                    moveX = -dir.x * moto.speed * speedMultiplier;
+                    moveZ = -dir.z * moto.speed * speedMultiplier;
+                }
+                //Brake
+                if (!inputStates.up && !inputStates.down) {
+                    moveX = velocity.x * 0.5; 
+                    moveZ = velocity.z * 0.5;
+                }
+
+                //Y = gravity
+                body.setLinearVelocity(new BABYLON.Vector3(moveX, velocity.y, moveZ));
+            };
+
+            resolve(moto);
+        });
     });
 }
 
-
 function createGround(scene) {
-    const groundOptions = { width:160, height:160 };
-
-    // a plane
-    let ground = BABYLON.MeshBuilder.CreateGround("myGround", groundOptions, scene);
-
+    const groundOptions = { width: 160, height: 5, depth: 160 };
+    let ground = BABYLON.MeshBuilder.CreateBox("myGround", groundOptions, scene); //Create a box instead of ground to allow good collision
+    ground.position.y = -2.5;
     let mirrorMaterial = new BABYLON.StandardMaterial("mirrorMaterial", scene);
     // mirrorMaterial.ambientColor = new BABYLON.Color3(0.1, 0.1, 0.1);
     // mirrorMaterial.
@@ -176,7 +187,8 @@ function createGround(scene) {
     mirrorMaterial.diffuseTexture.vScale = 20.0;
     
     ground.material = mirrorMaterial;
-    return ground, mirrorMaterial;
+    new BABYLON.PhysicsAggregate(ground, BABYLON.PhysicsShapeType.BOX, { mass: 0 }, scene); //Collision for the "ground"
+    return {ground, mirrorMaterial};
 }
 
 function createLight(scene) {
