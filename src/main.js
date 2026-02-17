@@ -7,11 +7,14 @@ let physicsPlugin; // Declare this globally
 let followCamera;
 let freeCamera;
 
+
+
 window.onload = startGame;
 
 async function startGame() {
     canvas = document.querySelector("#myCanvas");
     engine = new BABYLON.Engine(canvas, true);
+    initHUD();
 
     //Physic plugin
     const havokInstance = await HavokPhysics();
@@ -31,11 +34,41 @@ async function startGame() {
     createSphere(scene, mirrorMaterial);
     modifySettings();
 
+    // engine.runRenderLoop(() => {
+    //     let moto = scene.getMeshByName("moto");
+    //     // if (moto && moto.move) moto.move();
+    //     if (moto && moto.move) {
+    //         moto.move();
+
+    //         // Vitesse à partir du corps physique
+    //         let body = moto.physicsAggregate?.body;
+    //         if (body) {
+    //             let vel = body.getLinearVelocity(); // Vector3
+    //             let speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+
+    //             // FPS
+    //             let fps = engine.getFps(); // number
+
+    //             if (hudDiv) {
+    //                 hudDiv.innerHTML =
+    //                     "Vitesse: " + speed.toFixed(1) + " u/s | " +
+    //                     "FPS: " + fps.toFixed(0);
+    //             }
+    //         }
+    //     }
+    //     scene.render();
+
+        
+    // });
     engine.runRenderLoop(() => {
         let moto = scene.getMeshByName("moto");
         if (moto && moto.move) moto.move();
+
+        updateHUD(moto, engine.getFps());
+
         scene.render();
     });
+
 }
 
 function createScene() {
@@ -100,6 +133,7 @@ function createMoto(scene, mirrorMaterial) {
             moto.scaling = new BABYLON.Vector3(2, 2, 2);
             moto.name = "moto";
             moto.speed = -1;
+            moto.currentSpeed = 0;
 
             // == Trail derriere la moto ==
             // Créer deux points pour former un mur vertical
@@ -113,7 +147,7 @@ function createMoto(scene, mirrorMaterial) {
             
             // options du trail façon mur Tron vertical
             let trailOptions = {
-                diameter: 0.5,   // épaisseur du mur (fine)
+                diameter: 5,   // épaisseur du mur (fine)
                 length: 200,     // longueur max de la trace
                 segments: 60,
                 sections: 2,
@@ -437,7 +471,6 @@ function modifySettings() {
         }
     }, false);
 }
-
 
 
 window.addEventListener("resize", () => {
