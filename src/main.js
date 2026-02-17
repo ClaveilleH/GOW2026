@@ -19,6 +19,7 @@ async function startGame() {
     scene = new BABYLON.Scene(engine);
     scene.enablePhysics(new BABYLON.Vector3(0, -9.81, 0), physicsPlugin);
     scene.ambientColor = new BABYLON.Color3(0, 1, 0);
+
     let { ground, mirrorMaterial } = createGround(scene);
     freeCamera = createFreeCamera(scene);
     let light = createLight(scene);
@@ -100,6 +101,88 @@ function createMoto(scene, mirrorMaterial) {
             moto.name = "moto";
             moto.speed = -1;
 
+            // == Trail derriere la moto ==
+            // Créer deux points pour former un mur vertical
+            const trailSourceBottom = new BABYLON.TransformNode("trailSourceBottom", scene);
+            trailSourceBottom.parent = moto;
+            trailSourceBottom.position = new BABYLON.Vector3(0, 0, 1.5); // Point bas du mur
+            
+            const trailSourceTop = new BABYLON.TransformNode("trailSourceTop", scene);
+            trailSourceTop.parent = moto;
+            trailSourceTop.position = new BABYLON.Vector3(0, 1.3, 1.5); // Point haut du mur (5 unités de hauteur)
+            
+            // options du trail façon mur Tron vertical
+            let trailOptions = {
+                diameter: 0.5,   // épaisseur du mur (fine)
+                length: 200,     // longueur max de la trace
+                segments: 60,
+                sections: 2,
+                doNotTaper: true,
+                autoStart: true
+            };
+
+            // Créer un ribbon personnalisé pour un mur vertical
+            const lightWall = new BABYLON.RibbonBuilder.CreateRibbon("lightWall", {
+                pathArray: [[trailSourceBottom.position, trailSourceTop.position]],
+                updatable: true,
+                closeArray: false
+            }, scene);
+            
+            // Stocker les positions pour mettre à jour le ribbon
+            lightWall.trailPoints = [];
+            scene.registerBeforeRender(() => {
+                if (lightWall.trailPoints.length < 200) {
+                    lightWall.trailPoints.push({
+                        bottom: trailSourceBottom.getAbsolutePosition().clone(),
+                        top: trailSourceTop.getAbsolutePosition().clone()
+                    });
+                } else {
+                    lightWall.trailPoints.shift(); // Supprimer le point le plus ancien
+                    lightWall.trailPoints.push({
+                        bottom: trailSourceBottom.getAbsolutePosition().clone(),
+                        top: trailSourceTop.getAbsolutePosition().clone()
+                    });
+                }
+                
+                // Reconstruire le ribbon avec les nouveaux points
+                let pathArray = [];
+                for (let i = 0; i < lightWall.trailPoints.length; i++) {
+                    pathArray.push([lightWall.trailPoints[i].bottom, lightWall.trailPoints[i].top]);
+                }
+                
+                if (pathArray.length > 1) {
+                    lightWall.dispose();
+                    const newWall = BABYLON.MeshBuilder.CreateRibbon("lightWall", {
+                        pathArray: pathArray,
+                        updatable: true,
+                        closeArray: false,
+                        sideOrientation: BABYLON.Mesh.DOUBLESIDESIDEDNESS
+                    }, scene);
+                    
+                    // Appliquer le matériau
+                    const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+                    wallMat.diffuseColor = new BABYLON.Color3(0, 0.5, 1);
+                    wallMat.emissiveColor = new BABYLON.Color3(0, 0, 1);
+                    wallMat.specularColor = new BABYLON.Color3(0, 1, 1);
+                    wallMat.alpha = 0.9;
+                    wallMat.backFaceCulling = false; // Afficher les deux côtés du mur
+                    newWall.material = wallMat;
+                    
+                    Object.assign(lightWall, newWall);
+                }
+            });
+
+            // matériau émissif bleu
+            // const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+            // wallMat.diffuseColor = new BABYLON.Color3(0, 0.5, 0.5);
+            // wallMat.emissiveColor = new BABYLON.Color3(0, 1, 0.5);
+            // wallMat.specularColor = new BABYLON.Color3(0, 0, 0);
+            // wallMat.alpha = 0.9;
+
+            // lightWall.material = wallMat;
+
+
+
             // Setup Mirror
             mirrorMaterial.reflectionTexture.renderList.push(moto);
             if (moto.getChildMeshes) {
@@ -154,6 +237,14 @@ function createMoto(scene, mirrorMaterial) {
                 body.setLinearVelocity(new BABYLON.Vector3(moveX, velocity.y, moveZ));
             };
 
+            // let murParameters = { width: 1, height: 5, depth: 160 };
+            // const mur = new BABYLON.StandardMaterial("mur", murParameters, scene);
+            // mur.position = new BABYLON.Vector3(0, 0, 80);
+            // mur.material = new BABYLON.StandardMaterial("murMat", scene);
+            // mur.material.diffuseColor = new BABYLON.Color3(0, 0, 0);
+            // // mur.material.emissiveColor = new BABYLON.Color3(1, 0, 1);
+            // mur.isVisible = true;
+            
             resolve(moto);
         });
     });
