@@ -29,8 +29,8 @@ function updateHUD(moto, fps) {
         // HUD texte
         if (hudDiv) {
             hudDiv.innerHTML =
-                "Vitesse: " + speed.toFixed(1) + " u/s | " +
-                "FPS: " + fps.toFixed(0);
+                "Vitesse: <span style='color: #00ffff'>" + speed.toFixed(1) + " u/s</span> | " +
+                "FPS: <span style='color: #00ff00'>" + fps.toFixed(0) + "</span>";
         }
 
         // Historiques
