@@ -10,6 +10,7 @@ function createMoto(scene, mirrorMaterial) {
             moto.name = "moto";
             moto.speed = -1;
             moto.currentSpeed = 0;
+            moto.frontVector = new BABYLON.Vector3(0, 0, 1); // Direction initiale vers l'avant
 
             // == Trail derriere la moto ==
             // Créer deux points pour former un mur vertical
@@ -29,6 +30,13 @@ function createMoto(scene, mirrorMaterial) {
                 closeArray: false
             }, scene);
             
+            const wallAggregate = new BABYLON.PhysicsAggregate(
+                lightWall,
+                BABYLON.PhysicsShapeType.MESH,
+                { mass: 0, friction: 0.5, restitution: 0.1 },
+                scene
+            );
+
             // Stocker les positions pour mettre à jour le ribbon
             lightWall.trailPoints = [];
             scene.registerBeforeRender(() => {
@@ -38,11 +46,17 @@ function createMoto(scene, mirrorMaterial) {
                         top: trailSourceTop.getAbsolutePosition().clone()
                     });
                 } else {
-                    lightWall.trailPoints.shift(); // Supprimer le point le plus ancien
+                    // lightWall.trailPoints.shift(); // Supprimer le point le plus ancien
+                    // lightWall.trailPoints.push({
+                    //     bottom: trailSourceBottom.getAbsolutePosition().clone(),
+                    //     top: trailSourceTop.getAbsolutePosition().clone()
+                    // });
+                    // deplace le point le plus ancien à la position actuelle
                     lightWall.trailPoints.push({
                         bottom: trailSourceBottom.getAbsolutePosition().clone(),
                         top: trailSourceTop.getAbsolutePosition().clone()
                     });
+                    lightWall.trailPoints.shift();
                 }
                 
                 // Reconstruire le ribbon avec les nouveaux points
@@ -70,6 +84,15 @@ function createMoto(scene, mirrorMaterial) {
                     newWall.material = wallMat;
                     
                     Object.assign(lightWall, newWall);
+
+                    // Mettre à jour la physique
+                    wallAggregate.dispose();
+                    lightWall.physicsAggregate = new BABYLON.PhysicsAggregate(
+                        lightWall,
+                        BABYLON.PhysicsShapeType.MESH,
+                        { mass: 0, friction: 0.5, restitution: 0.1 },
+                        scene
+                    );
                 }
             });
 
@@ -108,34 +131,41 @@ function createMoto(scene, mirrorMaterial) {
             moto.move = () => {
                 let body = moto.physicsAggregate.body;
                 
-                if (inputStates.left) {
-                    moto.rotate(BABYLON.Axis.Y, -0.05, BABYLON.Space.WORLD);
-                }
-                if (inputStates.right) {
-                    moto.rotate(BABYLON.Axis.Y, 0.05, BABYLON.Space.WORLD);
-                }
                 let velocity = body.getLinearVelocity();
-                let speedMultiplier = 50;
                 let dir = moto.forward; //Get direction and rotation
                 let moveX = 0;
                 let moveZ = 0;
 
                 if (inputStates.up) {
-                    moveX = dir.x * moto.speed * speedMultiplier;
-                    moveZ = dir.z * moto.speed * speedMultiplier;
+                    // moveX = dir.x * moto.speed * speedMultiplier;
+                    // moveZ = dir.z * moto.speed * speedMultiplier;
+                    moto.moveWithCollisions(
+                        moto.frontVector.multiplyByFloats(- moto.speed , - moto.speed, - moto.speed )
+                    );
                 }
                 if (inputStates.down) {
-                    moveX = -dir.x * moto.speed * speedMultiplier;
-                    moveZ = -dir.z * moto.speed * speedMultiplier;
+                    // moveX = -dir.x * moto.speed * speedMultiplier;
+                    // moveZ = -dir.z * moto.speed * speedMultiplier;
+                    moto.moveWithCollisions(
+                        moto.frontVector.multiplyByFloats(moto.speed , 0, moto.speed )
+                    );
+                }
+                if (inputStates.left) {
+                    moto.rotate(BABYLON.Axis.Y, -0.05, BABYLON.Space.WORLD);
+                    moto.frontVector = BABYLON.Vector3.TransformNormal(moto.frontVector, BABYLON.Matrix.RotationY(-0.05));
+                }
+                if (inputStates.right) {
+                    moto.rotate(BABYLON.Axis.Y, 0.05, BABYLON.Space.WORLD);
+                    moto.frontVector = BABYLON.Vector3.TransformNormal(moto.frontVector, BABYLON.Matrix.RotationY(0.05));
                 }
                 //Brake
-                if (!inputStates.up && !inputStates.down) {
-                    moveX = velocity.x * 0.5; 
-                    moveZ = velocity.z * 0.5;
-                }
+                // if (!inputStates.up && !inputStates.down) {
+                //     moveX = velocity.x * 0.5; 
+                //     moveZ = velocity.z * 0.5;
+                // }
 
                 //Y = gravity
-                body.setLinearVelocity(new BABYLON.Vector3(moveX, velocity.y, moveZ));
+                // body.setLinearVelocity(new BABYLON.Vector3(moveX, velocity.y, moveZ));
             };
 
             // let murParameters = { width: 1, height: 5, depth: 160 };

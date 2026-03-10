@@ -1,5 +1,6 @@
 import { createMoto } from './moto.js';
 
+
 let canvas;
 let engine;
 let scene;
@@ -67,7 +68,7 @@ function createFreeCamera(scene) {
 function createFollowCamera(scene, target) {
     let camera = new BABYLON.FollowCamera("motoFollowCamera", target.position, scene, target);
 
-    camera.radius = 40; // how far from the object to follow
+    camera.radius = 30; // how far from the object to follow
 	camera.heightOffset = 10; // how high above the object to place the camera
 	camera.rotationOffset = 0; // the viewing angle
 	camera.cameraAcceleration = .1; // how fast to move
