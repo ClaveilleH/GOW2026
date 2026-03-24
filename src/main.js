@@ -122,11 +122,12 @@ function createLight(scene) {
 
 
 function createSphere(scene, mirrorMaterial) {
-    let spheres = [];
-    let sphereMaterials = [];
-
-    for (let i = 0; i < 10; i++) {
-        spheres[i] = BABYLON.MeshBuilder.CreateSphere("mySphere" + i, { diameter: 2, segments: 32 }, scene);
+    // let spheres = [];
+    // let sphereMaterials = [];
+    
+    for (let i = 0; i < 1; i++) {
+        BABYLON.MeshBuilder.CreateSphere("mySphere" + i, { diameter: 2, segments: 32 }, scene);
+        return;
         spheres[i].position.x += 3 * i - 9;
         spheres[i].position.y = 2;
 
@@ -183,7 +184,6 @@ function createSphere(scene, mirrorMaterial) {
     cylinderMaterial.alpha = 0.5;
     cylinderMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
     cylinderMaterial.emissiveColor = new BABYLON.Color3(1, 0, 1);
-
 
 
 

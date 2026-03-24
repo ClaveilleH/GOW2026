@@ -1,5 +1,8 @@
 import { inputStates } from './main.js';
 
+const TRAIL_LENGTH = 200; // Nombre de points dans la traînée
+// const TRAIL_LENGTH = 50; 
+
 function createMoto(scene, mirrorMaterial) {
     return new Promise((resolve) => {
         BABYLON.SceneLoader.ImportMesh("", "assets/models/", "lightCycleGen1.glb", scene, (meshes) => {
@@ -30,27 +33,23 @@ function createMoto(scene, mirrorMaterial) {
                 closeArray: false
             }, scene);
             
-            const wallAggregate = new BABYLON.PhysicsAggregate(
-                lightWall,
-                BABYLON.PhysicsShapeType.MESH,
-                { mass: 0, friction: 0.5, restitution: 0.1 },
-                scene
-            );
+            // const wallAggregate = new BABYLON.PhysicsAggregate(
+            //     lightWall,
+            //     BABYLON.PhysicsShapeType.MESH,
+            //     { mass: 0, friction: 0.5, restitution: 0.1 },
+            //     scene
+            // );
 
             // Stocker les positions pour mettre à jour le ribbon
             lightWall.trailPoints = [];
             scene.registerBeforeRender(() => {
-                if (lightWall.trailPoints.length < 200) {
+                if (lightWall.trailPoints.length < TRAIL_LENGTH) {
+                    console.log("trailPoints length:", lightWall.trailPoints.length);
                     lightWall.trailPoints.push({
                         bottom: trailSourceBottom.getAbsolutePosition().clone(),
                         top: trailSourceTop.getAbsolutePosition().clone()
                     });
                 } else {
-                    // lightWall.trailPoints.shift(); // Supprimer le point le plus ancien
-                    // lightWall.trailPoints.push({
-                    //     bottom: trailSourceBottom.getAbsolutePosition().clone(),
-                    //     top: trailSourceTop.getAbsolutePosition().clone()
-                    // });
                     // deplace le point le plus ancien à la position actuelle
                     lightWall.trailPoints.push({
                         bottom: trailSourceBottom.getAbsolutePosition().clone(),
@@ -65,35 +64,42 @@ function createMoto(scene, mirrorMaterial) {
                     pathArray.push([lightWall.trailPoints[i].bottom, lightWall.trailPoints[i].top]);
                 }
                 
-                if (pathArray.length > 1) {
-                    lightWall.dispose();
-                    const newWall = BABYLON.MeshBuilder.CreateRibbon("lightWall", {
-                        pathArray: pathArray,
-                        updatable: true,
-                        closeArray: false,
-                        sideOrientation: BABYLON.Mesh.DOUBLESIDESIDEDNESS
-                    }, scene);
-                    
-                    // Appliquer le matériau
-                    const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
-                    wallMat.diffuseColor = new BABYLON.Color3(0, 0.5, 1);
-                    wallMat.emissiveColor = new BABYLON.Color3(0, 0, 1);
-                    wallMat.specularColor = new BABYLON.Color3(0, 1, 1);
-                    wallMat.alpha = 0.9;
-                    wallMat.backFaceCulling = false; // Afficher les deux côtés du mur
-                    newWall.material = wallMat;
-                    
-                    Object.assign(lightWall, newWall);
-
-                    // Mettre à jour la physique
-                    wallAggregate.dispose();
-                    lightWall.physicsAggregate = new BABYLON.PhysicsAggregate(
-                        lightWall,
-                        BABYLON.PhysicsShapeType.MESH,
-                        { mass: 0, friction: 0.5, restitution: 0.1 },
-                        scene
-                    );
-                }
+                lightWall.dispose();
+                const newWall = BABYLON.MeshBuilder.CreateRibbon("lightWall", {
+                    pathArray: pathArray,
+                    updatable: true,
+                    closeArray: false,
+                    sideOrientation: BABYLON.Mesh.DOUBLESIDE
+                }, scene);
+                
+                // Appliquer le matériau
+                const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+                wallMat.diffuseColor = new BABYLON.Color3(0, 0.5, 1);
+                wallMat.emissiveColor = new BABYLON.Color3(0, 0, 1);
+                wallMat.specularColor = new BABYLON.Color3(0, 1, 1);
+                wallMat.alpha = 0.9;
+                wallMat.backFaceCulling = false; // Afficher les deux côtés du mur
+                
+                newWall.material = wallMat;
+                // Rendre le mur visible du dessus 
+                newWall.enableEdgesRendering();
+                newWall.edgesWidth = 6.0;
+                newWall.edgesColor = new BABYLON.Color4(0, 1, 1, 1);
+                
+                Object.assign(lightWall, newWall);
+                
+                
+                // Mettre à jour la physique
+                // wallAggregate.dispose();
+                // lightWall.physicsAggregate = new BABYLON.PhysicsAggregate(
+                //     lightWall,
+                //     BABYLON.PhysicsShapeType.MESH,
+                //     { mass: 0, friction: 0.5, restitution: 0.1 },
+                //     scene
+                // );
+                // ajout mur au mirror
+                // mirrorMaterial.reflectionTexture.renderList.push(lightWall);
+                
             });
 
             // matériau émissif bleu
