@@ -1,5 +1,6 @@
 import { createMoto } from './moto.js';
 
+
 let canvas;
 let engine;
 let scene;
@@ -75,7 +76,7 @@ function createFreeCamera(scene) {
 function createFollowCamera(scene, target) {
     let camera = new BABYLON.FollowCamera("motoFollowCamera", target.position, scene, target);
 
-    camera.radius = 40; // how far from the object to follow
+    camera.radius = 30; // how far from the object to follow
 	camera.heightOffset = 10; // how high above the object to place the camera
 	camera.rotationOffset = 0; // the viewing angle
 	camera.cameraAcceleration = .1; // how fast to move
@@ -165,11 +166,12 @@ function createWall(x, z, width, depth, rotation) {
 }
 
 function createSphere(scene, mirrorMaterial) {
-    let spheres = [];
-    let sphereMaterials = [];
-
-    for (let i = 0; i < 10; i++) {
-        spheres[i] = BABYLON.MeshBuilder.CreateSphere("mySphere" + i, { diameter: 2, segments: 32 }, scene);
+    // let spheres = [];
+    // let sphereMaterials = [];
+    
+    for (let i = 0; i < 1; i++) {
+        BABYLON.MeshBuilder.CreateSphere("mySphere" + i, { diameter: 2, segments: 32 }, scene);
+        return;
         spheres[i].position.x += 3 * i - 9;
         spheres[i].position.y = 2;
 
@@ -226,7 +228,6 @@ function createSphere(scene, mirrorMaterial) {
     cylinderMaterial.alpha = 0.5;
     cylinderMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
     cylinderMaterial.emissiveColor = new BABYLON.Color3(1, 0, 1);
-
 
 
 
