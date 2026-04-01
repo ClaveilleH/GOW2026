@@ -15,11 +15,12 @@ function createMoto(scene, mirrorMaterial) {
             // Créer deux points pour former un mur vertical
             const trailSourceBottom = new BABYLON.TransformNode("trailSourceBottom", scene);
             trailSourceBottom.parent = moto;
-            trailSourceBottom.position = new BABYLON.Vector3(0, 0, 1.5); // Point bas du mur
+            //x axes (weird), height, z axes (weird too seems to affect only when going left or right)
+            trailSourceBottom.position = new BABYLON.Vector3(0.0, 0, 1.5); // Point bas du mur 
             
             const trailSourceTop = new BABYLON.TransformNode("trailSourceTop", scene);
             trailSourceTop.parent = moto;
-            trailSourceTop.position = new BABYLON.Vector3(0, 1.3, 1.5); // Point haut du mur (5 unités de hauteur)
+            trailSourceTop.position = new BABYLON.Vector3(0.0, 1.3, 1.5); // Point haut du mur (5 unités de hauteur)
             
 
             // Créer un ribbon personnalisé pour un mur vertical
@@ -136,7 +137,14 @@ function createMoto(scene, mirrorMaterial) {
 
                 //Y = gravity
                 body.setLinearVelocity(new BABYLON.Vector3(moveX, velocity.y, moveZ));
+                //New physic but not accurate for now
+                // body.applyImpulse(new BABYLON.Vector3(moveX*0.0000001, 0, moveZ*0.0000001), moto.getAbsolutePosition());
             };
+
+            moto.physicsAggregate.body.getCollisionObservable().add((collisionEvent) => {
+                console.log("Collision detected with:", collisionEvent.collidedAgainst.transformNode.name);
+            });
+
 
             // let murParameters = { width: 1, height: 5, depth: 160 };
             // const mur = new BABYLON.StandardMaterial("mur", murParameters, scene);

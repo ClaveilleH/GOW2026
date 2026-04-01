@@ -9,6 +9,7 @@ let physicsPlugin; // Declare this globally
 let followCamera;
 let freeCamera;
 
+const GRAVITY = -9.81
 
 
 window.onload = startGame;
@@ -22,12 +23,19 @@ async function startGame() {
     const havokInstance = await HavokPhysics();
     physicsPlugin = new BABYLON.HavokPlugin(true, havokInstance);
     scene = new BABYLON.Scene(engine);
-    scene.enablePhysics(new BABYLON.Vector3(0, -9.81, 0), physicsPlugin);
+    scene.enablePhysics(new BABYLON.Vector3(0, GRAVITY, 0), physicsPlugin);
     scene.ambientColor = new BABYLON.Color3(0, 1, 0);
 
     let { ground, mirrorMaterial } = createGround(scene);
     freeCamera = createFreeCamera(scene);
     let light = createLight(scene);
+    let skybox = createSkyBox(scene);
+    //Create invisible walls
+    // createWall(0, 80, 160, 1, 0);
+    // createWall(0, -80, 160, 1, 0);
+
+    createWall(80, 0, 160, 1, 90);
+    createWall(-80, 0, 160, 1, 90);
 
     createMoto(scene, mirrorMaterial).then(_moto => {
         followCamera = createFollowCamera(scene, _moto);
@@ -118,7 +126,43 @@ function createLight(scene) {
     return light;
 }
 
+function createSkyBox(scene) {
+    let skybox = BABYLON.MeshBuilder.CreateBox("skyBox", {size:800.0}, scene);
+    let skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
+    skyboxMaterial.backFaceCulling = false;
+    skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture(
+        "assets/textures/", 
+        scene, 
+        ["_px.png", "_nx.png", "_py.png", "_ny.png", "_pz.png", "_nz.png"]
+    );
+    skybox.rotation.z = Math.PI / 2;
+    skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+    skyboxMaterial.disableLighting = true; 
+    skybox.material = skyboxMaterial;
 
+    return skybox
+
+}
+
+function createWall(x, z, width, depth, rotation) {
+    const wall = BABYLON.MeshBuilder.CreateBox("wall", {
+        width: width,
+        height: 10,
+        depth: depth
+    }, scene);
+
+    wall.position = new BABYLON.Vector3(x, 5, z);
+
+    wall.physicsAggregate = new BABYLON.PhysicsAggregate(
+        wall,
+        BABYLON.PhysicsShapeType.BOX,
+        { mass: 0 },
+        scene
+    );
+    wall.rotation.z = rotation
+
+    wall.isVisible = true;
+}
 
 function createSphere(scene, mirrorMaterial) {
     let spheres = [];
