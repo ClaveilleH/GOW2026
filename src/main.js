@@ -1,5 +1,5 @@
 import { createMoto } from './moto.js';
-
+import { moveBot } from './bot.js';
 
 let canvas;
 let engine;
@@ -31,26 +31,48 @@ async function startGame() {
     freeCamera = createFreeCamera(scene);
     let light = createLight(scene);
     let skybox = createSkyBox(scene);
-    //Create invisible walls
-    // createWall(0, 80, 160, 1, 0);
-    // createWall(0, -80, 160, 1, 0);
+    // North Wall
+    createWall(0, 80, 160, 1, 0);
+    // South Wall
+    createWall(0, -80, 160, 1, 0);
+    // East Wall (Rotated 90 degrees)
+    createWall(80, 0, 160, 1, Math.PI / 2);
+    // West Wall (Rotated 90 degrees)
+    createWall(-80, 0, 160, 1, Math.PI / 2);
 
-    createWall(80, 0, 160, 1, 90);
-    createWall(-80, 0, 160, 1, 90);
-
-    createMoto(scene, mirrorMaterial).then(_moto => {
+    let playerMoto;
+    let botMoto;
+    createMoto(scene, mirrorMaterial, true).then(_moto => {
+        playerMoto = _moto;
         followCamera = createFollowCamera(scene, _moto);
         scene.activeCamera = followCamera;
     });
-    createSphere(scene, mirrorMaterial);
+
+    createMoto(scene, mirrorMaterial, false).then(_moto => {
+        botMoto = _moto;
+    });
+    
+    // createSphere(scene, mirrorMaterial);
     modifySettings();
 
+    const music = new Audio("assets/sounds/df_dl.mp3");
+    music.loop = true;
+    music.volume = 0.5;
+
+    const playMusic = () => {
+        music.play().then(() => {
+            console.log("music playing");
+        }).catch(e => console.log("audio error:", e));
+        window.removeEventListener("click", playMusic);
+        window.removeEventListener("keydown", playMusic);
+    };
+    window.addEventListener("click", playMusic);
+    window.addEventListener("keydown", playMusic);
+
     engine.runRenderLoop(() => {
-        let moto = scene.getMeshByName("moto");
-        if (moto && moto.move) moto.move();
-
-        updateHUD(moto, engine.getFps());
-
+        if (playerMoto && playerMoto.move) playerMoto.move();
+        if (botMoto && botMoto.move) botMoto.move(); // move() already calls moveBot internally
+        updateHUD(playerMoto, engine.getFps());
         scene.render();
     });
 
@@ -114,7 +136,7 @@ function createGround(scene) {
     mirrorMaterial.diffuseTexture.vScale = 20.0;
     
     ground.material = mirrorMaterial;
-    new BABYLON.PhysicsAggregate(ground, BABYLON.PhysicsShapeType.BOX, { mass: 0 }, scene); //Collision for the "ground"
+    new BABYLON.PhysicsAggregate(ground, BABYLON.PhysicsShapeType.BOX, { mass: 0, restitution: 0}, scene); //Collision for the "ground"
     return {ground, mirrorMaterial};
 }
 
@@ -153,16 +175,25 @@ function createWall(x, z, width, depth, rotation) {
     }, scene);
 
     wall.position = new BABYLON.Vector3(x, 5, z);
+    wall.name = "wall";
+    wall.rotationQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, rotation);
 
-    wall.physicsAggregate = new BABYLON.PhysicsAggregate(
+    const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+    const wallTex = new BABYLON.Texture("assets/textures/circuit.jpg", scene);
+    wallTex.uScale = width / 20;  // repeat texture along the wall length
+    wallTex.vScale = 1;
+    wallMat.diffuseTexture = wallTex;
+    wallMat.emissiveTexture = wallTex; // makes it glow without needing light
+    wallMat.backFaceCulling = false;
+    wall.material = wallMat;
+
+    const wallAggregate = new BABYLON.PhysicsAggregate(
         wall,
         BABYLON.PhysicsShapeType.BOX,
-        { mass: 0 },
+        { mass: 0, friction: 0.5 },
         scene
     );
-    wall.rotation.z = rotation
-
-    wall.isVisible = true;
+    wallAggregate.body.setCollisionCallbackEnabled(true);
 }
 
 function createSphere(scene, mirrorMaterial) {
