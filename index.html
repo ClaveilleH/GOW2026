@@ -9,7 +9,6 @@
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <!-- <script src="lib/babylon.max.js"></script> -->
-    <script src="src/hud.js"></script>
     <script type="module" src="src/main.js"></script>
 </head>
 <body>
@@ -33,7 +32,55 @@
             <button id="toggleGraphBtn">Afficher Graph</button>
             <!-- Tu peux ajouter d'autres boutons ici -->
             <button id="debugAi">Debug AI</button>
+            <button id="godModeBtn">Activer Godmod</button>
+            <button id="wanderParamsBtn">Wander Params</button>
+            <button id="respawnBtn">Respawn</button>
             <button id="btnOption2">Option 2</button>
+        </div>
+
+        <!-- Wander Parameters Panel -->
+        <div id="wanderParamsPanel" style="display:none; flex-direction:column; margin-top:5px; background:rgba(0,0,0,0.8); border:1px solid #0f0; padding:10px; max-width:300px;">
+            <h3 style="color:#0f0; margin:0 0 10px 0; font-size:14px;">Wander Parameters</h3>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_distanceCercle_label">distanceCercle: 10.00</span>
+                <input type="range" id="wander_distanceCercle" min="0" max="20" step="0.1" style="width:100%;">
+            </label>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_wanderRadius_label">wanderRadius: 2.00</span>
+                <input type="range" id="wander_wanderRadius" min="0" max="5" step="0.1" style="width:100%;">
+            </label>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_displaceRange_label">displaceRange: 0.30</span>
+                <input type="range" id="wander_displaceRange" min="0" max="1" step="0.05" style="width:100%;">
+            </label>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_maxForce_label">maxForce: 8.00</span>
+                <input type="range" id="wander_maxForce" min="0" max="20" step="0.5" style="width:100%;">
+            </label>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_THRUST_FORCE_label">THRUST_FORCE: 10.00</span>
+                <input type="range" id="wander_THRUST_FORCE" min="0" max="30" step="0.5" style="width:100%;">
+            </label>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_MAX_SPEED_label">MAX_SPEED: 20.00</span>
+                <input type="range" id="wander_MAX_SPEED" min="0" max="50" step="1" style="width:100%;">
+            </label>
+            
+            <label style="color:#0f0; font-size:12px; margin:5px 0;">
+                <span id="wander_TURN_SPEED_label">TURN_SPEED: 0.07</span>
+                <input type="range" id="wander_TURN_SPEED" min="0" max="0.2" step="0.01" style="width:100%;">
+            </label>
+
+            <label style="color:#0f0; font-size:12px; margin:5px 0; display:flex; align-items:center;">
+                <input type="checkbox" id="wander_debug" style="margin-right:5px;">
+                Show Debug Helpers
+            </label>
         </div>
 
     </div>

@@ -14,6 +14,12 @@ function setMotoRotation(moto, angle) {
 }
 
 function resetMoto(moto) {
+    // Reset velocity and angular velocity
+    if (moto.physicsAggregate && moto.physicsAggregate.body) {
+        moto.physicsAggregate.body.setLinearVelocity(new BABYLON.Vector3(0, 0, 0));
+        moto.physicsAggregate.body.setAngularVelocity(new BABYLON.Vector3(0, 0, 0));
+    }
+    
     if(moto.name === "moto_player") {
         setMotoPosition(moto, 50, 3.0, 0);
         setMotoRotation(moto, Math.PI * 0.5);
@@ -22,6 +28,8 @@ function resetMoto(moto) {
         setMotoRotation(moto, 0);
     }
 }
+
+export { resetMoto };
 
 function createMoto(scene, mirrorMaterial, player = true) {
     return new Promise((resolve) => {
@@ -193,6 +201,9 @@ function createMoto(scene, mirrorMaterial, player = true) {
             // Collision
             body.setCollisionCallbackEnabled(true);
             body.getCollisionObservable().add((collisionEvent) => {
+                // Skip collision if godMode is enabled
+                if (window.godMode) return;
+
                 const hitName = collisionEvent.collidedAgainst?.transformNode?.name ?? "unknown";
                 if (hitName === "wall") {
                     body.setLinearVelocity(new BABYLON.Vector3(0, 0, 0));

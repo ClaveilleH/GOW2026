@@ -1,5 +1,6 @@
 import { createMoto } from './moto.js';
 import { moveBot } from './bot.js';
+import { initHUD, updateHUD } from './hud.js';
 
 let canvas;
 let engine;
@@ -16,6 +17,10 @@ let currentCameraIndex = 0;
 
 // let debugAI = false; // Flag to toggle AI debugging
 window.debugAI = false; // Make it accessible globally for HUD toggle
+window.godMode = false; // Disable collisions when enabled
+window.scene = null; // Expose scene globally
+window.playerMoto = null; // Expose player moto globally
+window.botMoto = null; // Expose bot moto globally
 
 
 const GRAVITY = -9.81
@@ -32,6 +37,7 @@ async function startGame() {
     const havokInstance = await HavokPhysics();
     physicsPlugin = new BABYLON.HavokPlugin(true, havokInstance);
     scene = new BABYLON.Scene(engine);
+    window.scene = scene; // Expose scene globally
     scene.enablePhysics(new BABYLON.Vector3(0, GRAVITY, 0), physicsPlugin);
     scene.ambientColor = new BABYLON.Color3(0, 1, 0);
 
@@ -49,10 +55,12 @@ async function startGame() {
     createWall(-80, 0, 160, 1, Math.PI / 2);
 
     let playerMoto = await createMoto(scene, mirrorMaterial, true);
+    window.playerMoto = playerMoto;
     followCamera = createFollowCamera(scene, playerMoto);
     scene.activeCamera = followCamera;
     
     let botMoto = await createMoto(scene, mirrorMaterial, false);
+    window.botMoto = botMoto;
     // botCamera = createBotCamera(scene, botMoto);
     botCamera = createFollowCamera(scene, botMoto);
     // createMoto(scene, mirrorMaterial, true).then(_moto => {
@@ -86,7 +94,7 @@ async function startGame() {
     engine.runRenderLoop(() => {
         if (playerMoto && playerMoto.move) playerMoto.move();
         if (botMoto && botMoto.move) botMoto.move(); // move() already calls moveBot internally
-        if (window.debugAI) aiDebugInfo(botMoto);
+        // if (window.debugAI) aiDebugInfo(botMoto);
         updateHUD(playerMoto, engine.getFps());
         scene.render();
     });
@@ -106,11 +114,13 @@ function aiDebugInfo(botMoto) {
 
     // Draw moto velocity vector in the scene for debugging
     const origin = botMoto.getAbsolutePosition();
-    const dir = velocity.normalize().scale(5); // scale for visibility
+    const dir = velocity.normalize().scale(10); // scale for visibility
     const debugLine = BABYLON.MeshBuilder.CreateLines("debugLine", {
         points: [origin, origin.add(dir)],
         updatable: true
     }, scene);
+    // faire en sorte que la ligne soit plus haute 
+    debugLine.position.y += 3;
     debugLine.color = new BABYLON.Color3(0, 1, 0); // green color for velocity vector
     // augementer l'epaisseur de la ligne
 

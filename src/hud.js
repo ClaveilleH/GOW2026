@@ -1,9 +1,13 @@
+import { wanderParams } from './bot.js';
+import { resetMoto } from './moto.js';
+
 let hudDiv;
 let metricsCanvas, metricsCtx;
 let speedHistory = [];
 let fpsHistory = [];
 
 let showGraph = false;
+let showWanderParams = false;
 
 const MAX_POINTS = 200;
 
@@ -32,24 +36,92 @@ function initHUD() {
     // Toggle debug AI
     const debugBtn = document.getElementById("debugAi");
     debugBtn.addEventListener("click", () => {
-        // Action pour le débogage de l'IA
         window.debugAI = !window.debugAI;
         debugBtn.textContent = window.debugAI ? "Cacher Debug AI" : "Afficher Debug AI";
     });
+
+    // Toggle godMode
+    const godModeBtn = document.getElementById("godModeBtn");
+    godModeBtn.addEventListener("click", () => {
+        window.godMode = !window.godMode;
+        godModeBtn.textContent = window.godMode ? "Désactiver Godmod" : "Activer Godmod";
+    });
+
+    // Toggle wander params menu
+    const wanderBtn = document.getElementById("wanderParamsBtn");
+    const wanderPanel = document.getElementById("wanderParamsPanel");
+    if (wanderBtn && wanderPanel) {
+        wanderBtn.addEventListener("click", () => {
+            showWanderParams = !showWanderParams;
+            wanderPanel.style.display = showWanderParams ? "flex" : "none";
+            wanderBtn.textContent = showWanderParams ? "Cacher Wander" : "Wander Params";
+        });
+        wanderPanel.style.display = "none";
+    }
+
+    // Initialize wander params controls
+    initWanderControls();
+
+    // Respawn button
+    const respawnBtn = document.getElementById("respawnBtn");
+    if (respawnBtn) {
+        respawnBtn.addEventListener("click", () => {
+            if (window.playerMoto) resetMoto(window.playerMoto);
+            if (window.botMoto) resetMoto(window.botMoto);
+            console.log("Respawn activated");
+        });
+    }
 
     // caché au départ
     metricsCanvas.style.display = "none";
 }
 
+function initWanderControls() {
+    const params = ['distanceCercle', 'wanderRadius', 'displaceRange', 'maxForce', 'THRUST_FORCE', 'MAX_SPEED', 'TURN_SPEED'];
+    
+    params.forEach(param => {
+        const inputId = `wander_${param}`;
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        input.value = wanderParams[param];
+        input.addEventListener("change", (e) => {
+            const value = parseFloat(e.target.value);
+            if (!isNaN(value)) {
+                wanderParams[param] = value;
+                document.getElementById(`${inputId}_label`).textContent = `${param}: ${value.toFixed(2)}`;
+            }
+        });
+        input.addEventListener("input", (e) => {
+            const value = parseFloat(e.target.value);
+            if (!isNaN(value)) {
+                document.getElementById(`${inputId}_label`).textContent = `${param}: ${value.toFixed(2)}`;
+            }
+        });
+    });
+
+    // Toggle debug visualization
+    const debugCheckbox = document.getElementById("wander_debug");
+    if (debugCheckbox) {
+        debugCheckbox.checked = wanderParams.debug;
+        debugCheckbox.addEventListener("change", (e) => {
+            wanderParams.debug = e.target.checked;
+        });
+    }
+}
+
 document.addEventListener("click", (e) => {
     const menu = document.getElementById("menuContainer");
     if (!menu.contains(e.target)) {
-        document.getElementById("menuPanel").style.display = "none";
+        const menuPanel = document.getElementById("menuPanel");
+        const wanderPanel = document.getElementById("wanderParamsPanel");
+        if (menuPanel) menuPanel.style.display = "none";
+        if (wanderPanel) wanderPanel.style.display = "none";
+        showWanderParams = false;
     }
 });
 
 function updateHUD(moto, fps) {
-
     let speed = 0;
     if (moto && moto.move) {
         let body = moto.physicsAggregate?.body;
@@ -73,12 +145,11 @@ function updateHUD(moto, fps) {
     if (speedHistory.length > MAX_POINTS) speedHistory.shift();
     if (fpsHistory.length > MAX_POINTS) fpsHistory.shift();
 
-    // 🔥 draw seulement si activé
+    // draw seulement si activé
     if (showGraph) {
         drawMetricsGraph();
     }
 }
-
 
 function drawMetricsGraph() {
     if (!metricsCtx) return;
@@ -127,3 +198,5 @@ function drawMetricsGraph() {
     }
     metricsCtx.stroke();
 }
+
+export { initHUD, updateHUD };
