@@ -25,3 +25,28 @@ html, body {
     border-radius: 4px;
     z-index: 10;
 }
+#menuToggleBtn {
+    background: rgba(0,0,0,0.7);
+    color: white;
+    border: 1px solid #00ffff;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+#menuPanel {
+    margin-top: 5px;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid #00ffff;
+    padding: 5px;
+}
+
+#menuPanel button {
+    margin: 3px 0;
+    padding: 6px;
+    background: black;
+    color: white;
+    border: 1px solid #00ffff;
+    cursor: pointer;
+}

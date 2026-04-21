@@ -9,6 +9,14 @@ let physicsPlugin; // Declare this globally
 
 let followCamera;
 let freeCamera;
+let botCamera;
+
+let cameras; // Declare cameras array globally
+let currentCameraIndex = 0;
+
+// let debugAI = false; // Flag to toggle AI debugging
+window.debugAI = false; // Make it accessible globally for HUD toggle
+
 
 const GRAVITY = -9.81
 
@@ -40,17 +48,23 @@ async function startGame() {
     // West Wall (Rotated 90 degrees)
     createWall(-80, 0, 160, 1, Math.PI / 2);
 
-    let playerMoto;
-    let botMoto;
-    createMoto(scene, mirrorMaterial, true).then(_moto => {
-        playerMoto = _moto;
-        followCamera = createFollowCamera(scene, _moto);
-        scene.activeCamera = followCamera;
-    });
+    let playerMoto = await createMoto(scene, mirrorMaterial, true);
+    followCamera = createFollowCamera(scene, playerMoto);
+    scene.activeCamera = followCamera;
+    
+    let botMoto = await createMoto(scene, mirrorMaterial, false);
+    // botCamera = createBotCamera(scene, botMoto);
+    botCamera = createFollowCamera(scene, botMoto);
+    // createMoto(scene, mirrorMaterial, true).then(_moto => {
+    //     playerMoto = _moto;
+    //     followCamera = createFollowCamera(scene, _moto);
+    //     scene.activeCamera = followCamera;
+    // });
 
-    createMoto(scene, mirrorMaterial, false).then(_moto => {
-        botMoto = _moto;
-    });
+    // createMoto(scene, mirrorMaterial, false).then(_moto => {
+    //     botMoto = _moto;
+    //     botCamera = createBotCamera(scene, _moto);
+    // });
     
     // createSphere(scene, mirrorMaterial);
     modifySettings();
@@ -72,18 +86,60 @@ async function startGame() {
     engine.runRenderLoop(() => {
         if (playerMoto && playerMoto.move) playerMoto.move();
         if (botMoto && botMoto.move) botMoto.move(); // move() already calls moveBot internally
+        if (window.debugAI) aiDebugInfo(botMoto);
         updateHUD(playerMoto, engine.getFps());
         scene.render();
     });
 
+    // une liste de cameras à basculer avec la touche C
+    cameras = [followCamera, freeCamera, botCamera];
+    // cameras = [followCamera, freeCamera]; // Temporarily exclude botCamera since it's not working well
+    currentCameraIndex = 0;
 }
 
-function switchCamera(newCamera) {
-    if (scene.activeCamera == followCamera) {
-        scene.activeCamera = freeCamera;
-    } else {
-        scene.activeCamera = followCamera;
+function aiDebugInfo(botMoto) {
+    if (!botMoto || !botMoto.physicsAggregate) return;
+    const body = botMoto.physicsAggregate.body;
+    const velocity = body.getLinearVelocity();
+    // console.log("Bot Velocity:", velocity);
+    // You can also add more info like position, rotation, etc.
+
+    // Draw moto velocity vector in the scene for debugging
+    const origin = botMoto.getAbsolutePosition();
+    const dir = velocity.normalize().scale(5); // scale for visibility
+    const debugLine = BABYLON.MeshBuilder.CreateLines("debugLine", {
+        points: [origin, origin.add(dir)],
+        updatable: true
+    }, scene);
+    debugLine.color = new BABYLON.Color3(0, 1, 0); // green color for velocity vector
+    // augementer l'epaisseur de la ligne
+
+
+    // Remove the debug line after a short time to avoid clutter
+    setTimeout(() => {
+        debugLine.dispose();
+    }, 100);
+}
+
+function switchCamera() {
+    // if (scene.activeCamera == followCamera) {
+    //     scene.activeCamera = freeCamera;
+    // } else {
+    //     scene.activeCamera = followCamera;
+    // }
+    console.log("cameras array:", cameras);
+    console.log("cameras length:", cameras.length);
+    currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+    console.log("Switching to camera index:", currentCameraIndex);
+
+    if (!cameras[currentCameraIndex]) {
+        console.warn("Camera undefined, skipping...");
+        return;
     }
+    
+    scene.activeCamera = cameras[currentCameraIndex];
+    console.log("Active camera is now:", cameras[currentCameraIndex].name);
+    // scene.activeCamera = followCamera; // Force followCamera for now, since botCamera is not working well
 }
 
 function createFreeCamera(scene) {
@@ -106,7 +162,6 @@ function createFollowCamera(scene, target) {
 
     return camera;
 }
-
 
 function createGround(scene) {
     const groundOptions = { width: 160, height: 5, depth: 160 };
@@ -194,88 +249,6 @@ function createWall(x, z, width, depth, rotation) {
         scene
     );
     wallAggregate.body.setCollisionCallbackEnabled(true);
-}
-
-function createSphere(scene, mirrorMaterial) {
-    // let spheres = [];
-    // let sphereMaterials = [];
-    
-    for (let i = 0; i < 1; i++) {
-        BABYLON.MeshBuilder.CreateSphere("mySphere" + i, { diameter: 2, segments: 32 }, scene);
-        return;
-        spheres[i].position.x += 3 * i - 9;
-        spheres[i].position.y = 2;
-
-        sphereMaterials[i] = new BABYLON.StandardMaterial("sphereMaterial" + i, scene);
-        spheres[i].material = sphereMaterials[i];
-
-        mirrorMaterial.reflectionTexture.renderList.push(spheres[i]);
-    }
-
-    sphereMaterials[0].ambiantColor = new BABYLON.Color3(0, 0.5, 0);
-    sphereMaterials[0].diffuseColor = new BABYLON.Color3(5, 0, 0);
-    sphereMaterials[0].specularColor = new BABYLON.Color3(0, 0, 0);
-
-    sphereMaterials[1].ambiantColor = new BABYLON.Color3(0, 0.5, 0);
-    sphereMaterials[1].diffuseColor = new BABYLON.Color3(5, 0, 1);
-    sphereMaterials[1].specularColor = new BABYLON.Color3(0, 0, 3);
-    // concentration of specular reflection, higher = smaller reflection spot
-    sphereMaterials[1].specularPower = 32;
-
-    sphereMaterials[2].ambiantColor = new BABYLON.Color3(0, 0.5, 0);
-    sphereMaterials[2].diffuseColor = new BABYLON.Color3(0, 0, 0);
-    // as if the sphere was illuminated from inside
-    sphereMaterials[2].emissiveColor = new BABYLON.Color3(0, 0, 1);
-
-    // sphereMaterials[3].diffuseTexture = new BABYLON.Texture("images/lightning.jpg", scene);
-    // // as if the sphere was illuminated from inside in Green
-    // sphereMaterials[3].emissiveColor = new BABYLON.Color3.Green
-    // sphereMaterials[4].diffuseTexture = new BABYLON.Texture("images/lightning.jpg", scene);
-    // sphereMaterials[4].emissiveColor = new BABYLON.Color3.Yellow
-    // sphereMaterials[5].diffuseTexture = new BABYLON.Texture("images/lightning.jpg", scene);
-    // sphereMaterials[5].emissiveColor = new BABYLON.Color3.Red;
-    // sphereMaterials[5].diffuseTexture.uScale *= 4;
-    sphereMaterials[6].ambientColor = new BABYLON.Color3(0, .8, 0);
-    sphereMaterials[6].diffuseColor = new BABYLON.Color3(1, 0, 0);
-    // alpha property means "alpha channel" = transparency
-    sphereMaterials[6].alpha = 0.2;
-
-    // sphereMaterials[7].diffuseTexture = new BABYLON.Texture("images/coins.png", scene);
-    // With .png textures that have some transparent pixels, we can
-    // have the texture "see through" if we set the hasAlpha property to true
-    // sphereMaterials[7].diffuseTexture.hasAlpha = true;
-    sphereMaterials[7].emissiveColor = new BABYLON.Color3.Red;
-
-    // sphereMaterials[8].ambientColor = new BABYLON.Color3(0, .3, 0);
-    // sphereMaterials[8].bumpTexture = new BABYLON.Texture("images/normal_map.jpg", scene);
-    // sphereMaterials[8].bumpTexture.level = 15.0;
-    // sphereMaterials[9].diffuseTexture = new BABYLON.VideoTexture("video", ["videos/michel.mp4"],scene);
-    // sphereMaterials[9].diffuseTexture.vScale *= -1;
-    let cylinder = BABYLON.MeshBuilder.CreateCylinder("myCylinder", { diameterTop: 3, diameterBottom: 3, height: 5, tessellation: 32 }, scene);
-    cylinder.position = new BABYLON.Vector3(10, 2.5, 0);
-    let cylinderMaterial = new BABYLON.StandardMaterial("cylinderMaterial", scene);
-    cylinder.material = cylinderMaterial;
-    mirrorMaterial.reflectionTexture.renderList.push(cylinder);
-    cylinderMaterial.alpha = 0.5;
-    cylinderMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
-    cylinderMaterial.emissiveColor = new BABYLON.Color3(1, 0, 1);
-
-
-
-    let counter = 0;
-
-    scene.registerBeforeRender(() => {
-        for (let i = 0; i < spheres.length; i++) {
-            spheres[i].position.z = 2 * i + Math.sin((i * counter) / 2);
-            counter += 0.005;
-
-            //sphereMaterials[i].wireframe = true
-        }
-
-        // sphereMaterials[4].diffuseTexture.uOffset += 0.005;
-        // sphereMaterials[5].diffuseTexture.uScale += 0.03;
-        cylinder.rotation.x += 0.01;
-    });
 }
 
 function modifySettings() {

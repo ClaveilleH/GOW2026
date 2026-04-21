@@ -3,43 +3,80 @@ let metricsCanvas, metricsCtx;
 let speedHistory = [];
 let fpsHistory = [];
 
-const MAX_POINTS = 200;
+let showGraph = false;
 
+const MAX_POINTS = 200;
 
 function initHUD() {
     hudDiv = document.getElementById("hud");
     metricsCanvas = document.getElementById("metricsCanvas");
     metricsCtx = metricsCanvas.getContext("2d");
+
+    const menuBtn = document.getElementById("menuToggleBtn");
+    const menuPanel = document.getElementById("menuPanel");
+    const graphBtn = document.getElementById("toggleGraphBtn");
+
+    // Toggle menu
+    menuBtn.addEventListener("click", () => {
+        const isVisible = menuPanel.style.display === "flex";
+        menuPanel.style.display = isVisible ? "none" : "flex";
+    });
+
+    // Toggle graph
+    graphBtn.addEventListener("click", () => {
+        showGraph = !showGraph;
+        metricsCanvas.style.display = showGraph ? "block" : "none";
+        graphBtn.textContent = showGraph ? "Cacher Graph" : "Afficher Graph";
+    });
+
+    // Toggle debug AI
+    const debugBtn = document.getElementById("debugAi");
+    debugBtn.addEventListener("click", () => {
+        // Action pour le débogage de l'IA
+        window.debugAI = !window.debugAI;
+        debugBtn.textContent = window.debugAI ? "Cacher Debug AI" : "Afficher Debug AI";
+    });
+
+    // caché au départ
+    metricsCanvas.style.display = "none";
 }
 
+document.addEventListener("click", (e) => {
+    const menu = document.getElementById("menuContainer");
+    if (!menu.contains(e.target)) {
+        document.getElementById("menuPanel").style.display = "none";
+    }
+});
 
 function updateHUD(moto, fps) {
 
-        let speed = 0;
-        if (moto && moto.move) {
-
-            let body = moto.physicsAggregate?.body;
-            if (body) {
-                let vel = body.getLinearVelocity();
-                speed = Math.sqrt(vel.x*vel.x + vel.y*vel.y + vel.z*vel.z);
-            }
+    let speed = 0;
+    if (moto && moto.move) {
+        let body = moto.physicsAggregate?.body;
+        if (body) {
+            let vel = body.getLinearVelocity();
+            speed = Math.sqrt(vel.x*vel.x + vel.y*vel.y + vel.z*vel.z);
         }
-        // let fps = engine.getFps();
+    }
 
-        // HUD texte
-        if (hudDiv) {
-            hudDiv.innerHTML =
-                "Vitesse: <span style='color: #00ffff'>" + speed.toFixed(1) + " u/s</span> | " +
-                "FPS: <span style='color: #00ff00'>" + fps.toFixed(0) + "</span>";
-        }
+    // HUD texte
+    if (hudDiv) {
+        hudDiv.innerHTML =
+            "Vitesse: <span style='color: #00ffff'>" + speed.toFixed(1) + " u/s</span> | " +
+            "FPS: <span style='color: #00ff00'>" + fps.toFixed(0) + "</span>";
+    }
 
-        // Historiques
-        speedHistory.push(speed);
-        fpsHistory.push(fps);
-        if (speedHistory.length > MAX_POINTS) speedHistory.shift();
-        if (fpsHistory.length > MAX_POINTS) fpsHistory.shift();
+    // Historique
+    speedHistory.push(speed);
+    fpsHistory.push(fps);
 
+    if (speedHistory.length > MAX_POINTS) speedHistory.shift();
+    if (fpsHistory.length > MAX_POINTS) fpsHistory.shift();
+
+    // 🔥 draw seulement si activé
+    if (showGraph) {
         drawMetricsGraph();
+    }
 }
 
 

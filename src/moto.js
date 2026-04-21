@@ -7,11 +7,19 @@ function setMotoPosition(moto, x, y, z) {
     moto.physicsAggregate.body.setTargetTransform(newPos, moto.rotationQuaternion);
 }
 
+function setMotoRotation(moto, angle) {
+    const rotQuat = BABYLON.Quaternion.FromEulerAngles(0, angle, 0);
+    moto.rotationQuaternion = rotQuat;
+    moto.physicsAggregate.body.setTargetTransform(moto.position, rotQuat);
+}
+
 function resetMoto(moto) {
     if(moto.name === "moto_player") {
         setMotoPosition(moto, 50, 3.0, 0);
+        setMotoRotation(moto, Math.PI * 0.5);
     }else {
         setMotoPosition(moto, 0, 5, 0);
+        setMotoRotation(moto, 0);
     }
 }
 
