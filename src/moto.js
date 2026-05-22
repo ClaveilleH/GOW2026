@@ -65,6 +65,7 @@ function createMoto(scene, mirrorMaterial, player = true) {
             wallMat.backFaceCulling = false;
 
             let trailPoints = [];
+            moto._trailPoints = trailPoints; // expose for bot avoidance (same array reference)
             let currentWall = null;
             let trailActive = true; // flag to pause trail on reset
 
@@ -187,13 +188,13 @@ function createMoto(scene, mirrorMaterial, player = true) {
 
             moto.resetTrail = () => {
                 trailActive = false;
-                trailPoints = [];
+                trailPoints.length = 0; // mutate in place to keep _trailPoints reference valid
                 if (currentWall) {
                     currentWall.dispose();
                     currentWall = null;
                 }
                 setTimeout(() => {
-                    trailPoints = [];
+                    trailPoints.length = 0;
                     trailActive = true;
                 }, 500);
             };

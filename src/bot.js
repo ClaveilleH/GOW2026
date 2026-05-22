@@ -5,16 +5,59 @@ export const wanderParams = {
   displaceRange:    0.3,
   maxForce:         8,
   THRUST_FORCE:     10,
-  MAX_SPEED:        20,
+  MAX_SPEED:        35,
   TURN_SPEED:       0.07,
+  maxSteerAngle:    Math.PI * 0.65,   // angle max de braquage par rapport au cap actuel (radians)
   // --- wall avoidance ---
-  wallAvoidRadius:  25,   // distance (unités monde) à partir de laquelle on fuit
-  wallAvoidWeight:  2.5,  // multiplicateur de la force de répulsion
-  ARENA_HALF:       78,   // demi-taille de l'arène (tes murs sont à ±80, un peu de marge)
+  wallAvoidRadius:  25,
+  wallAvoidWeight:  2.5,
+  ARENA_HALF:       78,
+  // --- moto avoidance ---
+  motoAvoidRadius:  30,
+  motoAvoidWeight:  5,
+  // --- trail avoidance ---
+  trailAvoidRadius: 20,
+  trailAvoidWeight: 7,
   debug:            true,
 };
 
-// ─── Helpers visuels ─────────────────────────────────────────────────────────
+// ─── Calcul de la force de poursuite (pursuit) ────────────────────────────────
+function computePursuit(moto, pos) {
+  const allMotos = [window.playerMoto, window.botMoto].filter(m => m && m !== moto);
+  if (allMotos.length === 0) return new BABYLON.Vector3(0, 0, 0);
+
+  // Trouver la cible la plus proche
+  let target = null;
+  let closestDist = Infinity;
+  for (const other of allMotos) {
+    const otherPos = other.getAbsolutePosition();
+    const dist = BABYLON.Vector3.Distance(pos, otherPos);
+    if (dist < closestDist) {
+      closestDist = dist;
+      target = other; 
+    }
+  }
+  if (!target) return new BABYLON.Vector3(0, 0, 0);
+
+  // Prédiction : où sera la cible dans ~3 frames ?
+  const targetPos = target.getAbsolutePosition();
+  const targetVel = target.physicsAggregate?.body.getLinearVelocity() || new BABYLON.Vector3(0, 0, 0);
+  const predictedPos = new BABYLON.Vector3(
+    targetPos.x + targetVel.x * 0.05,
+    0,
+    targetPos.z + targetVel.z * 0.05,
+  );
+
+  // Force vers la position prédite
+  let pursueForce = predictedPos.subtract(pos);
+  pursueForce.y = 0;
+  if (pursueForce.length() > 0.01) {
+    pursueForce.normalize().scaleInPlace(wanderParams.maxForce);
+  }
+  return pursueForce;
+}
+
+// ─── Calcul de la force de poursuite (pursuit) ────────────────────────────────
 function getOrCreateDebugHelpers(moto, scene) {
   if (moto._wanderDebug) return moto._wanderDebug;
 
@@ -83,6 +126,80 @@ function updateDebugHelpers(moto, centerPoint, targetPoint, wallForce, scene) {
   });
 }
 
+// ─── Calcul de la force de répulsion des autres motos (prédictif) ────────────
+function computeMotoAvoidance(selfMoto, pos) {
+  const p = wanderParams;
+  const force = new BABYLON.Vector3(0, 0, 0);
+  const others = [window.playerMoto, window.botMoto].filter(m => m && m !== selfMoto);
+
+  const selfVel = selfMoto.physicsAggregate?.body.getLinearVelocity() ?? new BABYLON.Vector3(0, 0, 0);
+
+  for (const other of others) {
+    const otherPos = other.getAbsolutePosition();
+    const otherVel = other.physicsAggregate?.body.getLinearVelocity() ?? new BABYLON.Vector3(0, 0, 0);
+
+    const dx = pos.x - otherPos.x;
+    const dz = pos.z - otherPos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) continue;
+
+    // Force actuelle (quadratique = plus forte à courte distance)
+    if (dist < p.motoAvoidRadius) {
+      const t = 1 - dist / p.motoAvoidRadius;
+      const strength = p.motoAvoidWeight * p.maxForce * t * t;
+      force.x += (dx / dist) * strength;
+      force.z += (dz / dist) * strength;
+    }
+
+    // Force prédictive : position dans 1 seconde
+    const T = 1.0;
+    const futDx = (pos.x + selfVel.x * T) - (otherPos.x + otherVel.x * T);
+    const futDz = (pos.z + selfVel.z * T) - (otherPos.z + otherVel.z * T);
+    const futDist = Math.sqrt(futDx * futDx + futDz * futDz);
+    if (futDist < p.motoAvoidRadius * 0.6 && futDist > 0.01) {
+      const t = 1 - futDist / (p.motoAvoidRadius * 0.6);
+      const strength = p.motoAvoidWeight * p.maxForce * t * 1.5;
+      force.x += (futDx / futDist) * strength;
+      force.z += (futDz / futDist) * strength;
+    }
+  }
+  return force;
+}
+
+// ─── Calcul de la force de répulsion des traînées (lightWalls) ───────────────
+function computeTrailAvoidance(selfMoto, pos) {
+  const p = wanderParams;
+  const force = new BABYLON.Vector3(0, 0, 0);
+  const allMotos = [window.playerMoto, window.botMoto].filter(m => m);
+
+  for (const moto of allMotos) {
+    const pts = moto._trailPoints;
+    if (!pts || pts.length < 2) continue;
+
+    const isSelf = moto === selfMoto;
+    // Pour le mur propre : ignorer les ~60 derniers points (traîne directement
+    // derrière la moto) pour ne pas se repousser soi-même en permanence.
+    // Pour les autres : ignorer les 20 derniers (gérés par motoAvoidance).
+    const skipTail = isSelf ? 60 : 20;
+    const end = Math.max(0, pts.length - skipTail);
+
+    for (let i = 0; i < end; i += 2) {
+      const tp = pts[i].bottom;
+      const dx = pos.x - tp.x;
+      const dz = pos.z - tp.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > p.trailAvoidRadius * p.trailAvoidRadius || distSq < 0.01) continue;
+
+      const dist = Math.sqrt(distSq);
+      const t = 1 - dist / p.trailAvoidRadius;
+      const strength = p.trailAvoidWeight * p.maxForce * t * t;
+      force.x += (dx / dist) * strength;
+      force.z += (dz / dist) * strength;
+    }
+  }
+  return force;
+}
+
 // ─── Calcul de la force de répulsion des murs ─────────────────────────────────
 function computeWallAvoidance(pos) {
   const p = wanderParams;
@@ -116,34 +233,24 @@ export function moveBot(moto, scene) {
   const pos     = moto.getAbsolutePosition();
   const forward = moto.forward.negate();
 
-  // ── Wander ────────────────────────────────────────────────────────────────
-  const centerPoint = pos.add(forward.scale(p.distanceCercle));
-
-  if (moto._wanderTheta === undefined) moto._wanderTheta = 0;
-  const heading     = Math.atan2(forward.x, forward.z);
-  const theta       = moto._wanderTheta + heading;
-
-  const targetPoint = centerPoint.add(new BABYLON.Vector3(
-    p.wanderRadius * Math.sin(theta),
-    0,
-    p.wanderRadius * Math.cos(theta),
-  ));
-
-  let wanderForce = targetPoint.subtract(pos);
-  wanderForce.y = 0;
-  wanderForce.normalize().scaleInPlace(p.maxForce);
-
-  moto._wanderTheta += (Math.random() - 0.5) * 2 * p.displaceRange;
+  // ── Pursuit (chasse la cible la plus proche) ──────────────────────────────
+  const pursueForce = computePursuit(moto, pos);
 
   // ── Wall avoidance ────────────────────────────────────────────────────────
   const wallForce = computeWallAvoidance(pos);
 
+  // ── Moto avoidance ────────────────────────────────────────────────────────
+  const motoForce = computeMotoAvoidance(moto, pos);
+
+  // ── Trail avoidance (lightWalls) ──────────────────────────────────────────
+  const trailForce = computeTrailAvoidance(moto, pos);
+
   // ── Force totale ──────────────────────────────────────────────────────────
-  const totalForce = wanderForce.add(wallForce);
+  const totalForce = pursueForce.add(wallForce).add(motoForce).add(trailForce);
   totalForce.y = 0;
 
   // ── Debug helpers ─────────────────────────────────────────────────────────
-  updateDebugHelpers(moto, centerPoint, targetPoint, wallForce, scene);
+  // (debug helpers skipped pour pursuit mode)
 
   // ── Application physique ──────────────────────────────────────────────────
   const velocity = body.getLinearVelocity();
@@ -156,11 +263,14 @@ export function moveBot(moto, scene) {
     forward.z * p.MAX_SPEED,
   ));
 
-  // Rotation via vitesse angulaire (compatible Havok — moto.rotate() est écrasé par le moteur physique)
+  // ── Rotation via vitesse angulaire (compatible Havok)
+  const heading = Math.atan2(forward.x, forward.z);
   const totalAngle = Math.atan2(totalForce.x, totalForce.z);
   let angleDiff    = totalAngle - heading;
   while (angleDiff >  Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+  // Clamp à l'angle de braquage max pour éviter les virages trop brusques
+  angleDiff = Math.max(-p.maxSteerAngle, Math.min(p.maxSteerAngle, angleDiff));
   body.setAngularVelocity(new BABYLON.Vector3(0, angleDiff * p.TURN_SPEED * 30, 0));
 
   // ── DEBUG LOGS (toutes les 60 frames) ────────────────────────────────────
