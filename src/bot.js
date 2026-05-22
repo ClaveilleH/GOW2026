@@ -114,7 +114,7 @@ export function moveBot(moto, scene) {
   const p       = wanderParams;
   const body    = moto.physicsAggregate.body;
   const pos     = moto.getAbsolutePosition();
-  const forward = moto.forward;
+  const forward = moto.forward.negate();
 
   // ── Wander ────────────────────────────────────────────────────────────────
   const centerPoint = pos.add(forward.scale(p.distanceCercle));
@@ -146,21 +146,36 @@ export function moveBot(moto, scene) {
   updateDebugHelpers(moto, centerPoint, targetPoint, wallForce, scene);
 
   // ── Application physique ──────────────────────────────────────────────────
-  const velocity     = body.getLinearVelocity();
-  const forwardSpeed = BABYLON.Vector3.Dot(velocity, forward);
+  const velocity = body.getLinearVelocity();
 
-  if (Math.abs(forwardSpeed) < p.MAX_SPEED) {
-    body.applyImpulse(
-      new BABYLON.Vector3(totalForce.x * p.THRUST_FORCE / p.maxForce, 0, totalForce.z * p.THRUST_FORCE / p.maxForce),
-      pos,
+  // Vélocité linéaire = toujours dans la direction forward à MAX_SPEED
+  // (le bot est un agent, pas un objet physique réaliste)
+  body.setLinearVelocity(new BABYLON.Vector3(
+    forward.x * p.MAX_SPEED,
+    velocity.y,
+    forward.z * p.MAX_SPEED,
+  ));
+
+  // Rotation via vitesse angulaire (compatible Havok — moto.rotate() est écrasé par le moteur physique)
+  const totalAngle = Math.atan2(totalForce.x, totalForce.z);
+  let angleDiff    = totalAngle - heading;
+  while (angleDiff >  Math.PI) angleDiff -= 2 * Math.PI;
+  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+  body.setAngularVelocity(new BABYLON.Vector3(0, angleDiff * p.TURN_SPEED * 30, 0));
+
+  // ── DEBUG LOGS (toutes les 60 frames) ────────────────────────────────────
+  if (!moto._dbgFrame) moto._dbgFrame = 0;
+  if (++moto._dbgFrame % 60 === 0) {
+    const velNow = body.getLinearVelocity();
+    const angVel = body.getAngularVelocity();
+    console.log('[BOT]',
+      'pos=(',    pos.x.toFixed(1), pos.y.toFixed(2), pos.z.toFixed(1), ')',
+      '| fwd=(',  forward.x.toFixed(2), forward.z.toFixed(2), ')',
+      '| vel=',   velNow.length().toFixed(2),
+      '| angDiff=', (angleDiff * 180 / Math.PI).toFixed(1) + '°',
+      'angVelY=', angVel.y.toFixed(3),
     );
   }
-
-  // Rotation vers la direction totale
-  const totalAngle = Math.atan2(totalForce.x, totalForce.z);
-  const angleDiff  = totalAngle - heading;
-  const turn       = Math.max(-1, Math.min(1, angleDiff));
-  moto.rotate(BABYLON.Axis.Y, turn * p.TURN_SPEED, BABYLON.Space.WORLD);
 }
 
 // ─── Nettoyage ────────────────────────────────────────────────────────────────
