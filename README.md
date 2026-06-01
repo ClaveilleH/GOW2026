@@ -14,6 +14,10 @@ Affronte un bot dans une arène : laisse une traînée lumineuse derrière toi e
 
 Projet dispo a ce [lien](https://mc.claveille.fr/)
 
+## Vidéo
+
+Petite démo [ici](https://youtu.be/heVV9p_ULGQ)
+
 ## Contrôles
 
 | Touche | Action                      |
